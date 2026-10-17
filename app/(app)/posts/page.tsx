@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server';
+﻿import { auth } from '@/lib/auth-server';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { PostList } from '@/components/posts/PostList';
@@ -26,3 +26,4 @@ export default async function PostsPage() {
     </div>
   );
 }
+

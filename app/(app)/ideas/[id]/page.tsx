@@ -1,6 +1,12 @@
-import { auth } from '@clerk/nextjs/server';
+import { auth } from '@/lib/auth-server';
 import { notFound, redirect } from 'next/navigation';
 import { db } from '@/lib/db';
+
+function toArray(val: unknown): string[] {
+  if (Array.isArray(val)) return val as string[];
+  if (typeof val === 'string') { try { return JSON.parse(val); } catch { return []; } }
+  return [];
+}
 
 export default async function IdeaDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -13,6 +19,8 @@ export default async function IdeaDetailPage({ params }: { params: Promise<{ id:
   const idea = await db.idea.findFirst({ where: { id, userId: user.id } });
   if (!idea) notFound();
 
+  const hooks = toArray(idea.hooks);
+
   return (
     <div className="space-y-6">
       <div>
@@ -21,11 +29,11 @@ export default async function IdeaDetailPage({ params }: { params: Promise<{ id:
       </div>
       <div className="rounded-lg border bg-card p-6">
         <p>{idea.description}</p>
-        {idea.hooks.length > 0 && (
+        {hooks.length > 0 && (
           <div className="mt-4">
             <h3 className="font-semibold text-sm mb-2">Suggested Hooks</h3>
             <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-              {idea.hooks.map((hook, i) => <li key={i}>{hook}</li>)}
+              {hooks.map((hook, i) => <li key={i}>{hook}</li>)}
             </ul>
           </div>
         )}

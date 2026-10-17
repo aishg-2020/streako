@@ -1,9 +1,9 @@
-'use server';
+﻿'use server';
 
-import { auth } from '@clerk/nextjs/server';
+import { auth } from '@/lib/auth-server';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
-import type { GoalPeriod } from '@prisma/client';
+import type { GoalPeriod } from '@/types/schema';
 
 export async function setGoal(data: { period: GoalPeriod; targetPosts: number; targetScripts: number }) {
   const { userId } = await auth();
@@ -53,9 +53,9 @@ export async function updateStreak() {
   const diffDays = lastDay ? Math.floor((today.getTime() - lastDay.getTime()) / 86400000) : null;
 
   let newCurrent = streak.current;
-  if (diffDays === 0) return; // already updated today
+  if (diffDays === 0) return;
   if (diffDays === 1) newCurrent = streak.current + 1;
-  else newCurrent = 1; // streak broken
+  else newCurrent = 1;
 
   await db.streak.update({
     where: { userId: user.id },

@@ -62,9 +62,9 @@ async function generateWeeklyReviewJob(userId: string) {
       userId,
       weekStart,
       summary: object.summary,
-      achievements: object.achievements,
-      improvements: object.improvements,
-      priorities: object.priorities,
+      achievements: JSON.stringify(object.achievements) as any,
+      improvements: JSON.stringify(object.improvements) as any,
+      priorities: JSON.stringify(object.priorities) as any,
       suggestedPlan: object.suggestedPlan ?? undefined,
     },
   });

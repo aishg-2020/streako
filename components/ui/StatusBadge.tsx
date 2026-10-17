@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import type { ContentStatus } from '@prisma/client';
+import type { ContentStatus } from '@/types/schema';
 
 const STATUS_STYLES: Record<ContentStatus, string> = {
   IDEA: 'bg-slate-100 text-slate-700',
@@ -19,15 +19,11 @@ const STATUS_LABELS: Record<ContentStatus, string> = {
   PUBLISHED: 'Published',
 };
 
-export function StatusBadge({ status }: { status: ContentStatus }) {
+export function StatusBadge({ status }: { status: string }) {
+  const s = status as ContentStatus;
   return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-        STATUS_STYLES[status]
-      )}
-    >
-      {STATUS_LABELS[status]}
+    <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', STATUS_STYLES[s])}>
+      {STATUS_LABELS[s] ?? s}
     </span>
   );
 }

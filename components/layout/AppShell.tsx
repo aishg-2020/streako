@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UserButton } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -14,12 +13,28 @@ const NAV_ITEMS = [
   { href: '/review', label: 'Weekly Review' },
 ];
 
+function UserAvatar({ isMock }: { isMock: boolean }) {
+  if (isMock) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="h-7 w-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">D</div>
+        <span>Demo</span>
+      </div>
+    );
+  }
+  // Lazy-load UserButton only when Clerk is active
+  const { UserButton } = require('@clerk/nextjs');
+  return <UserButton />;
+}
+
 export function AppShell({
   children,
   showSidebar = true,
+  isMock = false,
 }: {
   children: React.ReactNode;
   showSidebar?: boolean;
+  isMock?: boolean;
 }) {
   const pathname = usePathname();
 
@@ -32,6 +47,9 @@ export function AppShell({
       <aside className="w-56 shrink-0 border-r bg-card flex flex-col">
         <div className="p-4 border-b">
           <span className="font-bold text-lg">Creator OS</span>
+          {isMock && (
+            <span className="ml-2 rounded bg-yellow-100 px-1.5 py-0.5 text-xs text-yellow-700">mock</span>
+          )}
         </div>
         <nav className="flex-1 p-2 space-y-1">
           {NAV_ITEMS.map((item) => (
@@ -50,7 +68,7 @@ export function AppShell({
           ))}
         </nav>
         <div className="p-4 border-t">
-          <UserButton />
+          <UserAvatar isMock={isMock} />
         </div>
       </aside>
       <main className="flex-1 p-8 overflow-auto">{children}</main>

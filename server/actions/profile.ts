@@ -1,9 +1,9 @@
-'use server';
+﻿'use server';
 
-import { auth } from '@clerk/nextjs/server';
+import { auth } from '@/lib/auth-server';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
-import type { ExperienceLevel, Platform } from '@prisma/client';
+import type { ExperienceLevel, Platform } from '@/types/schema';
 
 export type ProfileFormData = {
   displayName: string;
@@ -18,6 +18,14 @@ export type ProfileFormData = {
   targetAudience: string;
 };
 
+function serializeArrays(data: Partial<ProfileFormData>) {
+  return {
+    ...data,
+    platforms: JSON.stringify(data.platforms ?? []),
+    contentCategories: JSON.stringify(data.contentCategories ?? []),
+  };
+}
+
 export async function saveProfile(data: ProfileFormData) {
   const { userId } = await auth();
   if (!userId) throw new Error('Unauthorized');
@@ -25,10 +33,13 @@ export async function saveProfile(data: ProfileFormData) {
   const user = await db.user.findUnique({ where: { clerkId: userId } });
   if (!user) throw new Error('User not found');
 
+  const serialized = serializeArrays(data);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await db.creatorProfile.upsert({
     where: { userId: user.id },
-    create: { ...data, userId: user.id, onboardingDone: true },
-    update: { ...data, onboardingDone: true },
+    create: { ...serialized, userId: user.id, onboardingDone: true } as any,
+    update: { ...serialized, onboardingDone: true } as any,
   });
 
   redirect('/dashboard');
@@ -41,8 +52,6 @@ export async function updateProfile(data: Partial<ProfileFormData>) {
   const user = await db.user.findUnique({ where: { clerkId: userId } });
   if (!user) throw new Error('User not found');
 
-  await db.creatorProfile.update({
-    where: { userId: user.id },
-    data,
-  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await db.creatorProfile.update({ where: { userId: user.id }, data: serializeArrays(data) as any });
 }

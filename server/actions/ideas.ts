@@ -1,9 +1,9 @@
-'use server';
+﻿'use server';
 
-import { auth } from '@clerk/nextjs/server';
+import { auth } from '@/lib/auth-server';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
-import type { ContentFormat, IdeaStatus, Platform } from '@prisma/client';
+import type { ContentFormat, IdeaStatus, Platform } from '@/types/schema';
 
 export async function createIdea(data: {
   title: string;
@@ -18,14 +18,16 @@ export async function createIdea(data: {
   const user = await db.user.findUnique({ where: { clerkId: userId } });
   if (!user) throw new Error('User not found');
 
-  await db.idea.create({
-    data: { ...data, hooks: data.hooks ?? [], userId: user.id },
-  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await db.idea.create({ data: { ...data, hooks: JSON.stringify(data.hooks ?? []), userId: user.id } as any });
 
   revalidatePath('/ideas');
 }
 
-export async function updateIdea(id: string, data: Partial<{ title: string; description: string; status: IdeaStatus }>) {
+export async function updateIdea(
+  id: string,
+  data: Partial<{ title: string; description: string; status: IdeaStatus }>
+) {
   const { userId } = await auth();
   if (!userId) throw new Error('Unauthorized');
 

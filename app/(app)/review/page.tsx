@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server';
+﻿import { auth } from '@/lib/auth-server';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { WeeklyReviewPanel } from '@/components/review/WeeklyReviewPanel';
@@ -25,3 +25,4 @@ export default async function ReviewPage() {
     </div>
   );
 }
+

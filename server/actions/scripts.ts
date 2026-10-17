@@ -1,6 +1,6 @@
-'use server';
+﻿'use server';
 
-import { auth } from '@clerk/nextjs/server';
+import { auth } from '@/lib/auth-server';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 
@@ -62,3 +62,4 @@ export async function createScriptVersion(contentItemId: string, body: string) {
   revalidatePath(`/content/${contentItemId}`);
   return script.id;
 }
+

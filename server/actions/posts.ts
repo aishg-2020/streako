@@ -1,9 +1,9 @@
-'use server';
+﻿'use server';
 
-import { auth } from '@clerk/nextjs/server';
+import { auth } from '@/lib/auth-server';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
-import type { Platform } from '@prisma/client';
+import type { Platform } from '@/types/schema';
 
 export async function createPost(data: {
   platform: Platform;

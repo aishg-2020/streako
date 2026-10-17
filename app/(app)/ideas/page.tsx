@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server';
+﻿import { auth } from '@/lib/auth-server';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { IdeaGrid } from '@/components/ideas/IdeaGrid';
@@ -38,3 +38,4 @@ export default async function IdeasPage() {
     </div>
   );
 }
+

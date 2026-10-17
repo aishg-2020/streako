@@ -4,6 +4,13 @@ import { useState } from 'react';
 import type { WeeklyReview } from '@prisma/client';
 import { formatDate } from '@/lib/utils';
 
+// In SQLite dev mode, array fields are JSON strings; in production they're real arrays.
+function toArray(val: unknown): string[] {
+  if (Array.isArray(val)) return val as string[];
+  if (typeof val === 'string') { try { return JSON.parse(val); } catch { return []; } }
+  return [];
+}
+
 export function WeeklyReviewPanel({ review, userId }: { review: WeeklyReview | null; userId: string }) {
   const [generating, setGenerating] = useState(false);
 
@@ -11,7 +18,6 @@ export function WeeklyReviewPanel({ review, userId }: { review: WeeklyReview | n
     setGenerating(true);
     await fetch('/api/ai/weekly-review', { method: 'POST' });
     setGenerating(false);
-    // Refresh — server will revalidate
     window.location.reload();
   }
 
@@ -30,6 +36,10 @@ export function WeeklyReviewPanel({ review, userId }: { review: WeeklyReview | n
     );
   }
 
+  const achievements = toArray(review.achievements);
+  const improvements = toArray(review.improvements);
+  const priorities = toArray(review.priorities);
+
   return (
     <div className="space-y-4">
       <div className="rounded-lg border bg-card p-4">
@@ -41,19 +51,19 @@ export function WeeklyReviewPanel({ review, userId }: { review: WeeklyReview | n
         <div className="rounded-lg border bg-card p-4">
           <h3 className="font-semibold text-sm mb-2">Achievements</h3>
           <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-            {review.achievements.map((a, i) => <li key={i}>{a}</li>)}
+            {achievements.map((a, i) => <li key={i}>{a}</li>)}
           </ul>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <h3 className="font-semibold text-sm mb-2">Improvements</h3>
           <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-            {review.improvements.map((a, i) => <li key={i}>{a}</li>)}
+            {improvements.map((a, i) => <li key={i}>{a}</li>)}
           </ul>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <h3 className="font-semibold text-sm mb-2">Priorities for Next Week</h3>
           <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-            {review.priorities.map((a, i) => <li key={i}>{a}</li>)}
+            {priorities.map((a, i) => <li key={i}>{a}</li>)}
           </ul>
         </div>
       </div>
