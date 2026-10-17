@@ -1,0 +1,219 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── User & Profile ───────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  clerkId       String   @unique
+  email         String   @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  profile       CreatorProfile?
+  ideas         Idea[]
+  contentItems  ContentItem[]
+  posts         Post[]
+  goals         Goal[]
+  challengeLogs ChallengeLog[]
+  weeklyReviews WeeklyReview[]
+  streaks       Streak[]
+}
+
+model CreatorProfile {
+  id                String          @id @default(cuid())
+  userId            String          @unique
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName       String
+  niche             String
+  contentCategories String[]
+  platforms         Platform[]
+  postingFrequency  Int
+  availableHours    Int
+  experienceLevel   ExperienceLevel
+  primaryGoal       String
+  tone              String
+  targetAudience    String
+  onboardingDone    Boolean         @default(false)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+// ─── Ideas ────────────────────────────────────────────────────────
+
+model Idea {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String
+  format      ContentFormat
+  platform    Platform
+  hooks       String[]
+  status      IdeaStatus    @default(SAVED)
+  contentItem ContentItem?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+// ─── Content Pipeline ─────────────────────────────────────────────
+
+model ContentItem {
+  id         String        @id @default(cuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ideaId     String?       @unique
+  idea       Idea?         @relation(fields: [ideaId], references: [id])
+  title      String
+  platform   Platform
+  format     ContentFormat
+  status     ContentStatus @default(IDEA)
+  targetDate DateTime?
+  notes      String?
+  scripts    Script[]
+  post       Post?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+model Script {
+  id            String      @id @default(cuid())
+  contentItemId String
+  contentItem   ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  version       Int         @default(1)
+  body          String
+  aiFeedback    Json?
+  shotList      Json?
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+// ─── Published Posts & Metrics ────────────────────────────────────
+
+model Post {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentItemId String?      @unique
+  contentItem   ContentItem? @relation(fields: [contentItemId], references: [id])
+  platform      Platform
+  url           String?
+  publishedAt   DateTime
+  metrics       PostMetric[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model PostMetric {
+  id         String   @id @default(cuid())
+  postId     String
+  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  views      Int?
+  likes      Int?
+  comments   Int?
+  shares     Int?
+  saves      Int?
+  recordedAt DateTime @default(now())
+}
+
+// ─── Goals, Streaks & Challenges ──────────────────────────────────
+
+model Goal {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  period        GoalPeriod @default(WEEKLY)
+  targetPosts   Int
+  targetScripts Int        @default(0)
+  active        Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model Streak {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  current      Int       @default(0)
+  longest      Int       @default(0)
+  lastActiveAt DateTime?
+  updatedAt    DateTime  @updatedAt
+}
+
+model ChallengeLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  description String
+  completedAt DateTime @default(now())
+}
+
+// ─── Weekly AI Review ─────────────────────────────────────────────
+
+model WeeklyReview {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStart     DateTime
+  summary       String
+  achievements  String[]
+  improvements  String[]
+  priorities    String[]
+  suggestedPlan Json?
+  createdAt     DateTime @default(now())
+}
+
+// ─── Enums ────────────────────────────────────────────────────────
+
+enum Platform {
+  INSTAGRAM
+  YOUTUBE
+  TIKTOK
+  LINKEDIN
+  TWITTER
+  OTHER
+}
+
+enum ContentFormat {
+  SHORT_VIDEO
+  LONG_VIDEO
+  CAROUSEL
+  STATIC_POST
+  BLOG
+  PODCAST
+  OTHER
+}
+
+enum ContentStatus {
+  IDEA
+  PLANNED
+  SCRIPT_READY
+  IN_PRODUCTION
+  READY_TO_PUBLISH
+  PUBLISHED
+}
+
+enum IdeaStatus {
+  SAVED
+  CONVERTED
+  REJECTED
+}
+
+enum ExperienceLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum GoalPeriod {
+  WEEKLY
+  MONTHLY
+}
