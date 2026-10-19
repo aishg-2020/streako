@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { generateObject } from 'ai';
 import { z } from 'zod';
@@ -62,9 +63,9 @@ async function generateWeeklyReviewJob(userId: string) {
       userId,
       weekStart,
       summary: object.summary,
-      achievements: JSON.stringify(object.achievements) as any,
-      improvements: JSON.stringify(object.improvements) as any,
-      priorities: JSON.stringify(object.priorities) as any,
+      achievements: JSON.stringify(object.achievements) as unknown as Prisma.WeeklyReviewUncheckedCreateInput['achievements'],
+      improvements: JSON.stringify(object.improvements) as unknown as Prisma.WeeklyReviewUncheckedCreateInput['improvements'],
+      priorities: JSON.stringify(object.priorities) as unknown as Prisma.WeeklyReviewUncheckedCreateInput['priorities'],
       suggestedPlan: object.suggestedPlan ?? undefined,
     },
   });

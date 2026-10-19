@@ -1,14 +1,15 @@
 import { redirect } from 'next/navigation';
+import { Flex } from 'antd';
 
-export default function SignUpPage() {
+export default async function SignUpPage() {
   if (process.env.MOCK_AUTH === 'true') {
     redirect('/dashboard');
   }
 
-  const { SignUp } = require('@clerk/nextjs');
+  const { SignUp } = await import('@clerk/nextjs');
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
+    <Flex align="center" justify="center" style={{ minHeight: '100vh' }}>
       <SignUp />
-    </div>
+    </Flex>
   );
 }

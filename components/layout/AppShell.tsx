@@ -1,29 +1,50 @@
 'use client';
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import { Avatar, Flex, Layout, Menu, Space, Tag, Typography } from 'antd';
+import {
+  AppstoreOutlined,
+  BulbOutlined,
+  CalendarOutlined,
+  DashboardOutlined,
+  RocketOutlined,
+  SendOutlined,
+  ThunderboltOutlined,
+} from '@ant-design/icons';
+import { brand } from '@/lib/theme';
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/ideas', label: 'Ideas' },
-  { href: '/content', label: 'Content' },
-  { href: '/posts', label: 'Posts' },
-  { href: '/goals', label: 'Goals' },
-  { href: '/review', label: 'Weekly Review' },
+  { href: '/dashboard', label: 'Dashboard', icon: <DashboardOutlined /> },
+  { href: '/ideas', label: 'Ideas', icon: <BulbOutlined /> },
+  { href: '/content', label: 'Content', icon: <AppstoreOutlined /> },
+  { href: '/posts', label: 'Posts', icon: <SendOutlined /> },
+  { href: '/goals', label: 'Goals', icon: <ThunderboltOutlined /> },
+  { href: '/review', label: 'Weekly Review', icon: <CalendarOutlined /> },
 ];
+
+// Lazy-load UserButton only when Clerk is active (the chunk is fetched on first render)
+const UserButton = dynamic(() => import('@clerk/nextjs').then((m) => m.UserButton));
 
 function UserAvatar({ isMock }: { isMock: boolean }) {
   if (isMock) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <div className="h-7 w-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">D</div>
-        <span>Demo</span>
-      </div>
+      <Space size={10}>
+        <Avatar size={32} style={{ background: brand.primarySoft, color: brand.primaryDark, fontWeight: 600 }}>
+          D
+        </Avatar>
+        <Flex vertical>
+          <Typography.Text strong style={{ lineHeight: 1.2 }}>
+            Demo
+          </Typography.Text>
+          <Typography.Text type="secondary" style={{ fontSize: 12, lineHeight: 1.2 }}>
+            demo@creator-os.dev
+          </Typography.Text>
+        </Flex>
+      </Space>
     );
   }
-  // Lazy-load UserButton only when Clerk is active
-  const { UserButton } = require('@clerk/nextjs');
   return <UserButton />;
 }
 
@@ -39,39 +60,55 @@ export function AppShell({
   const pathname = usePathname();
 
   if (!showSidebar) {
-    return <main className="min-h-screen bg-background">{children}</main>;
+    return <Layout style={{ minHeight: '100vh' }}>{children}</Layout>;
   }
 
+  const selected = NAV_ITEMS.find((item) => pathname.startsWith(item.href))?.href;
+
   return (
-    <div className="flex min-h-screen bg-background">
-      <aside className="w-56 shrink-0 border-r bg-card flex flex-col">
-        <div className="p-4 border-b">
-          <span className="font-bold text-lg">Creator OS</span>
-          {isMock && (
-            <span className="ml-2 rounded bg-yellow-100 px-1.5 py-0.5 text-xs text-yellow-700">mock</span>
-          )}
-        </div>
-        <nav className="flex-1 p-2 space-y-1">
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                pathname.startsWith(item.href)
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-              )}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="p-4 border-t">
-          <UserAvatar isMock={isMock} />
-        </div>
-      </aside>
-      <main className="flex-1 p-8 overflow-auto">{children}</main>
-    </div>
+    <Layout style={{ minHeight: '100vh' }} hasSider>
+      <Layout.Sider
+        width={240}
+        breakpoint="lg"
+        collapsedWidth={64}
+        style={{ borderInlineEnd: `1px solid ${brand.line}`, position: 'sticky', top: 0, height: '100vh' }}
+      >
+        <Flex vertical style={{ height: '100%' }}>
+          <Link href="/dashboard" style={{ display: 'block', padding: '20px 20px 16px' }}>
+            <Space size={10} align="center">
+              <Avatar shape="square" size={32} style={{ background: brand.primary }} icon={<RocketOutlined />} />
+              <Flex vertical>
+                <Typography.Text strong style={{ fontSize: 16, lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+                  Creator OS
+                </Typography.Text>
+                {isMock && (
+                  <Tag color="gold" style={{ width: 'fit-content', marginTop: 4, marginInlineEnd: 0, lineHeight: '18px' }}>
+                    mock
+                  </Tag>
+                )}
+              </Flex>
+            </Space>
+          </Link>
+
+          <Menu
+            mode="inline"
+            selectedKeys={selected ? [selected] : []}
+            style={{ borderInlineEnd: 0, flex: 1 }}
+            items={NAV_ITEMS.map((item) => ({
+              key: item.href,
+              icon: item.icon,
+              label: <Link href={item.href}>{item.label}</Link>,
+            }))}
+          />
+
+          <div style={{ padding: 16, borderTop: `1px solid ${brand.line}` }}>
+            <UserAvatar isMock={isMock} />
+          </div>
+        </Flex>
+      </Layout.Sider>
+      <Layout>
+        <Layout.Content style={{ padding: '28px 32px', maxWidth: 1440, width: '100%' }}>{children}</Layout.Content>
+      </Layout>
+    </Layout>
   );
 }

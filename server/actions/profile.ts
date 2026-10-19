@@ -2,6 +2,7 @@
 
 import { auth } from '@/lib/auth-server';
 import { redirect } from 'next/navigation';
+import type { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import type { ExperienceLevel, Platform } from '@/types/schema';
 
@@ -35,11 +36,10 @@ export async function saveProfile(data: ProfileFormData) {
 
   const serialized = serializeArrays(data);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await db.creatorProfile.upsert({
     where: { userId: user.id },
-    create: { ...serialized, userId: user.id, onboardingDone: true } as any,
-    update: { ...serialized, onboardingDone: true } as any,
+    create: { ...serialized, userId: user.id, onboardingDone: true } as unknown as Prisma.CreatorProfileUncheckedCreateInput,
+    update: { ...serialized, onboardingDone: true } as unknown as Prisma.CreatorProfileUncheckedUpdateInput,
   });
 
   redirect('/dashboard');

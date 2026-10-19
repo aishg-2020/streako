@@ -1,60 +1,33 @@
 ﻿import { auth } from '@/lib/auth-server';
 import { streamObject } from 'ai';
-import { z } from 'zod';
 import { model } from '@/lib/ai';
 import { db } from '@/lib/db';
 import { buildScriptFeedbackPrompt } from '@/lib/prompts/scriptFeedback';
+import { ScriptFeedbackRequestSchema, ScriptFeedbackSchema } from '@/lib/scripts/schema';
+import { buildMockFeedback, mockFeedbackStreamResponse } from '@/lib/scripts/mock';
 
-const FeedbackSchema = z.object({
-  overallScore: z.number().min(1).max(10),
-  strengths: z.array(z.string()),
-  improvements: z.array(z.string()),
-  hookAnalysis: z.string(),
-  pacing: z.string(),
-  suggestions: z.array(z.string()),
-  shotList: z.array(
-    z.object({
-      scene: z.number(),
-      description: z.string(),
-      type: z.string(),
-    })
-  ),
-});
-
-const MOCK_FEEDBACK = {
-  overallScore: 7,
-  strengths: [
-    'Strong opening hook that creates curiosity',
-    'Clear and simple language accessible to beginners',
-    'Good use of personal story to build trust',
-  ],
-  improvements: [
-    'The middle section loses momentum — tighten the explanation at the 45-second mark',
-    'Missing a clear call-to-action at the end',
-    'Could use a pattern interrupt around the 30-second mark to re-engage viewers',
-  ],
-  hookAnalysis: 'Your hook is effective — it leads with a relatable problem and promises a specific outcome. Consider making the stakes clearer in the first 3 seconds.',
-  pacing: 'Good overall pace but slows noticeably around the 40–50 second section. Consider cutting the background context and getting to the solution faster.',
-  suggestions: [
-    'Add a "here\'s what we\'ll cover" roadmap at the 10-second mark',
-    'End with a question to boost comments: "What\'s your biggest money mistake?"',
-    'Add on-screen text for the key stat to reinforce retention',
-  ],
-  shotList: [
-    { scene: 1, description: 'Talking head — hook statement to camera', type: 'Medium shot' },
-    { scene: 2, description: 'Screen recording of the concept being demonstrated', type: 'Screen capture' },
-    { scene: 3, description: 'Back to camera for the main takeaway', type: 'Close-up' },
-    { scene: 4, description: 'Text overlay with the key stat', type: 'Graphic insert' },
-    { scene: 5, description: 'CTA to camera', type: 'Medium shot' },
-  ],
-};
-
+/**
+ * Streams structured AI feedback for a script as JSON text, token by token.
+ *
+ * Body: { scriptBody: string }
+ * Response: text/plain stream whose concatenated chunks form a ScriptFeedback object.
+ */
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    body = {};
+  }
+  const parsed = ScriptFeedbackRequestSchema.safeParse(body ?? {});
+  if (!parsed.success) return new Response(parsed.error.issues[0]?.message ?? 'Invalid request body', { status: 400 });
+  const { scriptBody } = parsed.data;
+
   if (process.env.MOCK_AI === 'true') {
-    return Response.json(MOCK_FEEDBACK);
+    return mockFeedbackStreamResponse(buildMockFeedback(scriptBody), req.signal);
   }
 
   const user = await db.user.findUnique({
@@ -63,18 +36,14 @@ export async function POST(req: Request) {
   });
   if (!user?.profile) return new Response('Profile not found', { status: 404 });
 
-  const body = await req.json();
-  const { scriptBody } = body;
-
-  if (!scriptBody) return new Response('Missing script body', { status: 400 });
-
   const { system, prompt } = buildScriptFeedbackPrompt(user.profile as never, scriptBody);
 
   const result = streamObject({
     model,
-    schema: FeedbackSchema,
+    schema: ScriptFeedbackSchema,
     system,
     prompt,
+    abortSignal: req.signal,
   });
 
   return result.toTextStreamResponse();

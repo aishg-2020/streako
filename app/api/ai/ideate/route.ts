@@ -1,86 +1,57 @@
 ﻿import { auth } from '@/lib/auth-server';
 import { streamObject } from 'ai';
-import { z } from 'zod';
 import { model } from '@/lib/ai';
 import { db } from '@/lib/db';
 import { buildIdeatePrompt } from '@/lib/prompts/ideate';
+import { GeneratedIdeasSchema, IdeateRequestSchema } from '@/lib/ideas/schema';
+import { mockIdeasStreamResponse, pickMockIdeas } from '@/lib/ideas/mock';
 
-const IdeaSchema = z.object({
-  ideas: z.array(
-    z.object({
-      title: z.string(),
-      description: z.string(),
-      format: z.enum(['SHORT_VIDEO', 'LONG_VIDEO', 'CAROUSEL', 'STATIC_POST', 'BLOG', 'PODCAST', 'OTHER']),
-      platform: z.enum(['INSTAGRAM', 'YOUTUBE', 'TIKTOK', 'LINKEDIN', 'TWITTER', 'OTHER']),
-      hooks: z.array(z.string()),
-    })
-  ),
-});
-
-const MOCK_IDEAS = {
-  ideas: [
-    {
-      title: '5 Money Mistakes I Made in My 20s (And How to Avoid Them)',
-      description: 'Personal story-driven video covering common personal finance pitfalls with actionable alternatives.',
-      format: 'SHORT_VIDEO' as const,
-      platform: 'YOUTUBE' as const,
-      hooks: ['I lost $10k making this mistake...', 'Nobody talks about this financial trap'],
-    },
-    {
-      title: 'The 50/30/20 Budget Rule — Does It Actually Work?',
-      description: 'Data-backed breakdown of the popular budgeting rule with real examples for different income levels.',
-      format: 'CAROUSEL' as const,
-      platform: 'INSTAGRAM' as const,
-      hooks: ['Swipe to see if this rule works for YOUR income', 'This changed how I think about budgeting'],
-    },
-    {
-      title: 'Index Funds vs ETFs: What No One Tells Beginners',
-      description: 'Clear explainer cutting through jargon, ideal for first-time investors aged 22–35.',
-      format: 'SHORT_VIDEO' as const,
-      platform: 'TIKTOK' as const,
-      hooks: ['Your financial advisor doesn\'t want you to know this', 'I wish someone told me this at 22'],
-    },
-    {
-      title: 'How I Saved $20k on a $50k Salary in 12 Months',
-      description: 'Month-by-month breakdown of a real savings journey with spreadsheet template.',
-      format: 'LONG_VIDEO' as const,
-      platform: 'YOUTUBE' as const,
-      hooks: ['Month 1 was the hardest...', 'The exact system I used (free template below)'],
-    },
-    {
-      title: 'Emergency Fund Myths That Are Keeping You Broke',
-      description: 'Challenges conventional wisdom about emergency fund size and placement with evidence-based advice.',
-      format: 'STATIC_POST' as const,
-      platform: 'LINKEDIN' as const,
-      hooks: ['3 months? Wrong. Here\'s the real number', 'Stop keeping your emergency fund here'],
-    },
-  ],
-};
-
+/**
+ * Streams AI-generated content ideas as JSON text, token by token.
+ *
+ * Body: { topic?: string; count?: 1–5 (default 5); exclude?: string[] }
+ *   - `count: 1` + `exclude` is used by the UI to regenerate a single idea.
+ * Response: text/plain stream whose concatenated chunks form `{ "ideas": [...] }`.
+ */
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return new Response('Unauthorized', { status: 401 });
 
-  if (process.env.MOCK_AI === 'true') {
-    return Response.json(MOCK_IDEAS);
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    body = {};
   }
+  const parsed = IdeateRequestSchema.safeParse(body ?? {});
+  if (!parsed.success) return new Response('Invalid request body', { status: 400 });
+  const { topic, count, exclude } = parsed.data;
 
   const user = await db.user.findUnique({
     where: { clerkId: userId },
-    include: { profile: true },
+    include: {
+      profile: true,
+      ideas: { select: { title: true }, orderBy: { createdAt: 'desc' }, take: 30 },
+    },
   });
+
+  // Avoid suggesting anything already on screen or already in the idea bank.
+  const avoid = Array.from(new Set([...exclude, ...(user?.ideas.map((i) => i.title) ?? [])]));
+
+  if (process.env.MOCK_AI === 'true') {
+    return mockIdeasStreamResponse(pickMockIdeas(count, avoid), req.signal);
+  }
+
   if (!user?.profile) return new Response('Profile not found', { status: 404 });
 
-  const body = await req.json();
-  const { topic } = body;
-
-  const { system, prompt } = buildIdeatePrompt(user.profile as never, topic);
+  const { system, prompt } = buildIdeatePrompt(user.profile as never, topic || undefined, { count, exclude: avoid });
 
   const result = streamObject({
     model,
-    schema: IdeaSchema,
+    schema: GeneratedIdeasSchema,
     system,
     prompt,
+    abortSignal: req.signal,
   });
 
   return result.toTextStreamResponse();

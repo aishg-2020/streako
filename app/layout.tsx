@@ -1,5 +1,8 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { AntdRegistry } from "@ant-design/nextjs-registry";
+import { AntdProvider } from "@/components/providers/AntdProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -20,20 +23,22 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const isMock = process.env.MOCK_AUTH === 'true';
 
-  if (isMock) {
-    return (
-      <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-        <body className="min-h-full">{children}</body>
-      </html>
-    );
-  }
+  const body = (
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body>
+        {/* The style registry seeds its cache with a random id, which Next's prerender treats as
+            request-time work; the Suspense boundary lets it stream instead of blocking. */}
+        <Suspense fallback={null}>
+          <AntdRegistry>
+            <AntdProvider>{children}</AntdProvider>
+          </AntdRegistry>
+        </Suspense>
+      </body>
+    </html>
+  );
+
+  if (isMock) return body;
 
   const { ClerkProvider } = await import('@clerk/nextjs');
-  return (
-    <ClerkProvider>
-      <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-        <body className="min-h-full">{children}</body>
-      </html>
-    </ClerkProvider>
-  );
+  return <ClerkProvider>{body}</ClerkProvider>;
 }

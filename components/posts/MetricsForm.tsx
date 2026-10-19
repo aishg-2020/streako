@@ -1,83 +1,104 @@
 'use client';
 
-import { useState } from 'react';
-import type { PostMetric } from '@prisma/client';
+import { useId, useState, useTransition } from 'react';
 import { addMetricSnapshot } from '@/server/actions/posts';
-import { formatDate } from '@/lib/utils';
+import { METRIC_FIELDS, METRIC_LABELS, MetricSnapshotSchema, type MetricField } from '@/lib/posts/schema';
+import { Button, Card, Col, Flex, Form, InputNumber, Row, Typography } from 'antd';
 
-export function MetricsForm({ postId, history }: { postId: string; history: PostMetric[] }) {
-  const [form, setForm] = useState({ views: '', likes: '', comments: '', shares: '', saves: '' });
-  const [saving, setSaving] = useState(false);
+type FormValues = Record<MetricField, string>;
+const EMPTY: FormValues = { views: '', likes: '', comments: '', shares: '', saves: '' };
 
-  async function handleSubmit(e: React.FormEvent) {
+function toInput(values: FormValues) {
+  return Object.fromEntries(
+    METRIC_FIELDS.map((f) => [f, values[f].trim() === '' ? undefined : Number(values[f])])
+  ) as Partial<Record<MetricField, number>>;
+}
+
+/** Logs a new metrics snapshot for a post. Each submission adds a row; nothing is overwritten. */
+export function MetricsForm({ postId }: { postId: string }) {
+  const id = useId();
+  const [values, setValues] = useState<FormValues>(EMPTY);
+  const [errors, setErrors] = useState<Partial<Record<MetricField | 'form', string>>>({});
+  const [message, setMessage] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function submit(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true);
-    await addMetricSnapshot(postId, {
-      views: form.views ? Number(form.views) : undefined,
-      likes: form.likes ? Number(form.likes) : undefined,
-      comments: form.comments ? Number(form.comments) : undefined,
-      shares: form.shares ? Number(form.shares) : undefined,
-      saves: form.saves ? Number(form.saves) : undefined,
+    setMessage(null);
+
+    const parsed = MetricSnapshotSchema.safeParse(toInput(values));
+    if (!parsed.success) {
+      const next: typeof errors = {};
+      for (const issue of parsed.error.issues) {
+        const key = (issue.path[0] as MetricField | undefined) ?? 'form';
+        next[key] ??= issue.message;
+      }
+      setErrors(next);
+      return;
+    }
+
+    setErrors({});
+    startTransition(async () => {
+      const result = await addMetricSnapshot(postId, parsed.data);
+      if (!result.ok) {
+        setErrors({ form: result.error });
+        return;
+      }
+      setValues(EMPTY);
+      setMessage('Snapshot logged.');
     });
-    setForm({ views: '', likes: '', comments: '', shares: '', saves: '' });
-    setSaving(false);
   }
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-lg border bg-card p-4">
-        <h2 className="font-semibold text-sm mb-3">Add Metric Snapshot</h2>
-        <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {(['views', 'likes', 'comments', 'shares', 'saves'] as const).map((field) => (
-            <input
-              key={field}
-              type="number"
-              min={0}
-              placeholder={field}
-              className="rounded-md border px-3 py-2 text-sm"
-              value={form[field]}
-              onChange={(e) => setForm((p) => ({ ...p, [field]: e.target.value }))}
-            />
-          ))}
-          <button
-            type="submit"
-            disabled={saving}
-            className="col-span-2 sm:col-span-5 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-60"
-          >
-            {saving ? 'Saving...' : 'Save snapshot'}
-          </button>
-        </form>
-      </div>
-
-      {history.length > 0 && (
-        <div className="rounded-lg border bg-card p-4">
-          <h2 className="font-semibold text-sm mb-3">History</h2>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-left text-muted-foreground border-b">
-                <th className="pb-2">Date</th>
-                <th className="pb-2">Views</th>
-                <th className="pb-2">Likes</th>
-                <th className="pb-2">Comments</th>
-                <th className="pb-2">Shares</th>
-                <th className="pb-2">Saves</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((m) => (
-                <tr key={m.id} className="border-b last:border-0">
-                  <td className="py-2">{formatDate(m.recordedAt)}</td>
-                  <td className="py-2">{m.views ?? '—'}</td>
-                  <td className="py-2">{m.likes ?? '—'}</td>
-                  <td className="py-2">{m.comments ?? '—'}</td>
-                  <td className="py-2">{m.shares ?? '—'}</td>
-                  <td className="py-2">{m.saves ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+    <Card
+      aria-labelledby={`${id}-heading`}
+      title={<span id={`${id}-heading`}>Log metrics</span>}
+      extra={
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          Each entry is kept as a new snapshot.
+        </Typography.Text>
+      }
+    >
+      <form onSubmit={submit} noValidate>
+        <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 16, fontSize: 13 }}>
+          Enter the current totals from the platform.
+        </Typography.Text>
+        <Form layout="vertical" component="div">
+          <Row gutter={[12, 0]}>
+            {METRIC_FIELDS.map((f) => (
+              <Col key={f} xs={12} sm={8} lg={4}>
+                <Form.Item
+                  label={<label htmlFor={`${id}-${f}`}>{METRIC_LABELS[f]}</label>}
+                  validateStatus={errors[f] ? 'error' : undefined}
+                  help={errors[f]}
+                >
+                  <InputNumber
+                    id={`${id}-${f}`}
+                    step={1}
+                    controls={false}
+                    style={{ width: '100%' }}
+                    value={values[f] === '' ? null : Number(values[f])}
+                    onChange={(value) => {
+                      setValues((v) => ({ ...v, [f]: value === null || value === undefined ? '' : String(value) }));
+                      setErrors((er) => ({ ...er, [f]: undefined, form: undefined }));
+                    }}
+                    aria-invalid={!!errors[f]}
+                    placeholder="0"
+                  />
+                </Form.Item>
+              </Col>
+            ))}
+          </Row>
+        </Form>
+        <Flex align="center" gap={12} wrap>
+          <Button type="primary" htmlType="submit" loading={isPending}>
+            {isPending ? 'Saving…' : 'Save snapshot'}
+          </Button>
+          <Typography.Text role="status" aria-live="polite" type={errors.form ? 'danger' : 'success'} style={{ fontSize: 12 }}>
+            {errors.form ?? message ?? ''}
+          </Typography.Text>
+        </Flex>
+      </form>
+    </Card>
   );
 }

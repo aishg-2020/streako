@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { Goal } from '@prisma/client';
+import { Button, Card, Flex, Form, InputNumber } from 'antd';
 import { setGoal } from '@/server/actions/goals';
 
 export function GoalSetter({ goals, userId }: { goals: Goal[]; userId: string }) {
@@ -17,37 +18,20 @@ export function GoalSetter({ goals, userId }: { goals: Goal[]; userId: string })
   }
 
   return (
-    <div className="rounded-lg border bg-card p-4 space-y-3">
-      <h2 className="font-semibold text-sm">Weekly Goals</h2>
-      <div className="flex gap-4">
-        <div>
-          <label className="text-xs text-muted-foreground">Posts target</label>
-          <input
-            type="number"
-            min={0}
-            value={posts}
-            onChange={(e) => setPosts(Number(e.target.value))}
-            className="mt-1 w-20 rounded-md border px-2 py-1 text-sm"
-          />
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground">Scripts target</label>
-          <input
-            type="number"
-            min={0}
-            value={scripts}
-            onChange={(e) => setScripts(Number(e.target.value))}
-            className="mt-1 w-20 rounded-md border px-2 py-1 text-sm"
-          />
-        </div>
-      </div>
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-60"
-      >
+    <Card title="Weekly Goals" size="small">
+      <Form layout="vertical" component="div">
+        <Flex gap={16} wrap>
+          <Form.Item label="Posts target" style={{ marginBottom: 12 }}>
+            <InputNumber min={0} value={posts} onChange={(value) => setPosts(Number(value))} style={{ width: 96 }} />
+          </Form.Item>
+          <Form.Item label="Scripts target" style={{ marginBottom: 12 }}>
+            <InputNumber min={0} value={scripts} onChange={(value) => setScripts(Number(value))} style={{ width: 96 }} />
+          </Form.Item>
+        </Flex>
+      </Form>
+      <Button type="primary" onClick={handleSave} loading={saving}>
         {saving ? 'Saving...' : 'Save goal'}
-      </button>
-    </div>
+      </Button>
+    </Card>
   );
 }

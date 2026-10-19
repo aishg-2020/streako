@@ -1,16 +1,17 @@
 import { redirect } from 'next/navigation';
+import { Flex } from 'antd';
 
-export default function SignInPage() {
+export default async function SignInPage() {
   // In mock mode skip the Clerk UI — the user is always "logged in"
   if (process.env.MOCK_AUTH === 'true') {
     redirect('/dashboard');
   }
 
   // Lazy import so Clerk is never loaded without real keys
-  const { SignIn } = require('@clerk/nextjs');
+  const { SignIn } = await import('@clerk/nextjs');
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
+    <Flex align="center" justify="center" style={{ minHeight: '100vh' }}>
       <SignIn />
-    </div>
+    </Flex>
   );
 }

@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import type { WeeklyReview } from '@prisma/client';
+import { Button, Card, Col, Flex, Row, Typography } from 'antd';
+import { ReloadOutlined, StarOutlined } from '@ant-design/icons';
 import { formatDate } from '@/lib/utils';
 
 // In SQLite dev mode, array fields are JSON strings; in production they're real arrays.
@@ -9,6 +11,18 @@ function toArray(val: unknown): string[] {
   if (Array.isArray(val)) return val as string[];
   if (typeof val === 'string') { try { return JSON.parse(val); } catch { return []; } }
   return [];
+}
+
+function BulletList({ items }: { items: string[] }) {
+  return (
+    <ul style={{ margin: 0, paddingInlineStart: 18, lineHeight: 1.7 }}>
+      {items.map((a, i) => (
+        <li key={i}>
+          <Typography.Text type="secondary">{a}</Typography.Text>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export function WeeklyReviewPanel({ review, userId }: { review: WeeklyReview | null; userId: string }) {
@@ -23,16 +37,14 @@ export function WeeklyReviewPanel({ review, userId }: { review: WeeklyReview | n
 
   if (!review) {
     return (
-      <div className="rounded-lg border bg-card p-6 text-center space-y-3">
-        <p className="text-sm text-muted-foreground">No weekly review yet.</p>
-        <button
-          onClick={handleGenerate}
-          disabled={generating}
-          className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-60"
-        >
-          {generating ? 'Generating...' : 'Generate Review'}
-        </button>
-      </div>
+      <Card>
+        <Flex vertical align="center" gap={12} style={{ padding: 16, textAlign: 'center' }}>
+          <Typography.Text type="secondary">No weekly review yet.</Typography.Text>
+          <Button type="primary" icon={<StarOutlined />} onClick={handleGenerate} loading={generating}>
+            {generating ? 'Generating...' : 'Generate Review'}
+          </Button>
+        </Flex>
+      </Card>
     );
   }
 
@@ -41,40 +53,37 @@ export function WeeklyReviewPanel({ review, userId }: { review: WeeklyReview | n
   const priorities = toArray(review.priorities);
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-lg border bg-card p-4">
-        <p className="text-xs text-muted-foreground mb-1">Week of {formatDate(review.weekStart)}</p>
-        <p className="text-sm">{review.summary}</p>
-      </div>
+    <Flex vertical gap={16}>
+      <Card>
+        <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>
+          Week of {formatDate(review.weekStart)}
+        </Typography.Text>
+        <Typography.Paragraph style={{ marginBottom: 0 }}>{review.summary}</Typography.Paragraph>
+      </Card>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg border bg-card p-4">
-          <h3 className="font-semibold text-sm mb-2">Achievements</h3>
-          <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-            {achievements.map((a, i) => <li key={i}>{a}</li>)}
-          </ul>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <h3 className="font-semibold text-sm mb-2">Improvements</h3>
-          <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-            {improvements.map((a, i) => <li key={i}>{a}</li>)}
-          </ul>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <h3 className="font-semibold text-sm mb-2">Priorities for Next Week</h3>
-          <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-            {priorities.map((a, i) => <li key={i}>{a}</li>)}
-          </ul>
-        </div>
-      </div>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} md={8}>
+          <Card title="Achievements" size="small" style={{ height: '100%' }}>
+            <BulletList items={achievements} />
+          </Card>
+        </Col>
+        <Col xs={24} md={8}>
+          <Card title="Improvements" size="small" style={{ height: '100%' }}>
+            <BulletList items={improvements} />
+          </Card>
+        </Col>
+        <Col xs={24} md={8}>
+          <Card title="Priorities for Next Week" size="small" style={{ height: '100%' }}>
+            <BulletList items={priorities} />
+          </Card>
+        </Col>
+      </Row>
 
-      <button
-        onClick={handleGenerate}
-        disabled={generating}
-        className="rounded-md border px-4 py-2 text-sm disabled:opacity-60"
-      >
-        {generating ? 'Regenerating...' : 'Regenerate'}
-      </button>
-    </div>
+      <div>
+        <Button icon={<ReloadOutlined />} onClick={handleGenerate} loading={generating}>
+          {generating ? 'Regenerating...' : 'Regenerate'}
+        </Button>
+      </div>
+    </Flex>
   );
 }

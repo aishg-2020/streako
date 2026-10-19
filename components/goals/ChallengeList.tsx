@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import type { ChallengeLog } from '@prisma/client';
+import { Button, Card, Flex, Input, Typography } from 'antd';
+import { RowList } from '@/components/ui/RowList';
 import { completeChallenge } from '@/server/actions/goals';
 import { formatDate } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -19,36 +21,35 @@ export function ChallengeList({ challenges, userId }: { challenges: ChallengeLog
   }
 
   return (
-    <div className="rounded-lg border bg-card p-4 space-y-3">
-      <h2 className="font-semibold text-sm">Challenge Log</h2>
-      <div className="flex gap-2">
-        <input
-          className="flex-1 rounded-md border px-3 py-2 text-sm"
+    <Card title="Challenge Log" size="small">
+      <Flex gap={8} style={{ marginBottom: 16 }}>
+        <Input
           placeholder="Log a completed challenge..."
           value={desc}
           onChange={(e) => setDesc(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
         />
-        <button
-          onClick={handleAdd}
-          disabled={saving || !desc.trim()}
-          className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-60"
-        >
+        <Button type="primary" onClick={handleAdd} disabled={saving || !desc.trim()} loading={saving}>
           Add
-        </button>
-      </div>
+        </Button>
+      </Flex>
       {challenges.length === 0 ? (
         <EmptyState title="No challenges logged yet" />
       ) : (
-        <ul className="space-y-2">
-          {challenges.map((c) => (
-            <li key={c.id} className="flex justify-between text-sm">
-              <span>{c.description}</span>
-              <span className="text-xs text-muted-foreground">{formatDate(c.completedAt)}</span>
-            </li>
-          ))}
-        </ul>
+        <RowList
+          size="small"
+          items={challenges}
+          rowKey={(c) => c.id}
+          renderItem={(c) => (
+            <Flex justify="space-between" style={{ width: '100%' }} gap={12}>
+              <Typography.Text>{c.description}</Typography.Text>
+              <Typography.Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                {formatDate(c.completedAt)}
+              </Typography.Text>
+            </Flex>
+          )}
+        />
       )}
-    </div>
+    </Card>
   );
 }

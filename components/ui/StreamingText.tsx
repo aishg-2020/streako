@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { Typography } from 'antd';
 
 export function StreamingText({ text }: { text: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -12,9 +13,9 @@ export function StreamingText({ text }: { text: string }) {
   }, [text]);
 
   return (
-    <div ref={ref} className="whitespace-pre-wrap text-sm leading-relaxed">
+    <Typography.Paragraph ref={ref} style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>
       {text}
-      {text && <span className="inline-block w-1 h-4 ml-0.5 bg-current animate-pulse" />}
-    </div>
+      {text && <span aria-hidden className="streaming-caret" />}
+    </Typography.Paragraph>
   );
 }

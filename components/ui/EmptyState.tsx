@@ -1,13 +1,27 @@
+'use client';
+
+import { Card, Empty } from 'antd';
+import { Text } from '@/components/ui/typography';
+
 export function EmptyState({ title, description, action }: {
   title: string;
   description?: string;
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-10 text-center">
-      <p className="font-semibold text-foreground">{title}</p>
-      {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
-      {action && <div className="mt-4">{action}</div>}
-    </div>
+    <Card variant="borderless" style={{ background: 'transparent', border: '1px dashed var(--ant-color-border)' }}>
+      <Empty
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+        styles={{ image: { height: 56 } }}
+        description={
+          <span>
+            <Text strong style={{ display: 'block' }}>{title}</Text>
+            {description && <Text type="secondary">{description}</Text>}
+          </span>
+        }
+      >
+        {action}
+      </Empty>
+    </Card>
   );
 }

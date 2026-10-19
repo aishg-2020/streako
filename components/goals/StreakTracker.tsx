@@ -1,16 +1,18 @@
 import type { Streak } from '@prisma/client';
+import { Card, Statistic } from 'antd';
+import { Text } from '@/components/ui/typography';
 
 export function StreakTracker({ streak }: { streak: Streak | null }) {
   return (
-    <div className="rounded-lg border bg-card p-4 space-y-3">
-      <h2 className="font-semibold text-sm">Streak</h2>
-      <div className="text-center">
-        <p className="text-5xl font-bold">{streak?.current ?? 0}</p>
-        <p className="text-sm text-muted-foreground mt-1">day streak</p>
-      </div>
-      <div className="text-center text-xs text-muted-foreground">
+    <Card title="Streak" size="small" style={{ textAlign: 'center' }}>
+      <Statistic
+        value={streak?.current ?? 0}
+        suffix={<Text type="secondary" style={{ fontSize: 14 }}>day streak</Text>}
+        styles={{ content: { fontSize: 48, fontWeight: 700 } }}
+      />
+      <Text type="secondary" style={{ fontSize: 12 }}>
         Longest: {streak?.longest ?? 0} days
-      </div>
-    </div>
+      </Text>
+    </Card>
   );
 }

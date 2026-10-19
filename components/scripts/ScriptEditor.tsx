@@ -1,124 +1,209 @@
 'use client';
 
-import { useState } from 'react';
-import type { Script } from '@prisma/client';
-import { saveScript, createScriptVersion } from '@/server/actions/scripts';
+import Link from 'next/link';
+import { useEffect, useRef, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { saveScriptVersion } from '@/server/actions/scripts';
+import { SCRIPT_LIMITS, type ScriptFeedback } from '@/lib/scripts/schema';
+import { Alert, Button, Card, Col, Flex, Input, Row, Tag, Typography } from 'antd';
+import { RowList } from '@/components/ui/RowList';
+import { SaveOutlined } from '@ant-design/icons';
+import { formatDate } from '@/lib/utils';
+import { ScriptFeedbackPanel } from './ScriptFeedbackPanel';
 
-type Feedback = {
-  overallScore: number;
-  strengths: string[];
-  improvements: string[];
-  hookAnalysis: string;
-  suggestions: string[];
+export type ScriptVersionSummary = {
+  id: string;
+  version: number;
+  isActive: boolean;
+  updatedAt: Date;
+  wordCount: number;
+  /** True for an untouched empty draft; saving fills it in rather than adding a version. */
+  isEmpty: boolean;
 };
 
-export function ScriptEditor({ script }: { script: Script & { contentItem: { id: string; title: string } } }) {
+type Props = {
+  script: { id: string; contentItemId: string; version: number; body: string; isActive: boolean };
+  versions: ScriptVersionSummary[];
+  initialFeedback: ScriptFeedback | null;
+};
+
+/** Plain-textarea script editor. Every save creates a new version; older versions stay readable. */
+export function ScriptEditor({ script, versions, initialFeedback }: Props) {
+  const router = useRouter();
   const [body, setBody] = useState(script.body);
-  const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState<Feedback | null>(
-    script.aiFeedback as Feedback | null
-  );
-  const [loadingFeedback, setLoadingFeedback] = useState(false);
+  const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const bodyRef = useRef(body); // mirrors `body` for the async save path
 
-  async function handleSave() {
-    setSaving(true);
-    await saveScript(script.contentItemId, body);
-    setSaving(false);
-  }
+  const dirty = body !== script.body;
+  const latest = versions[0];
+  const isLatest = !latest || latest.id === script.id;
+  const words = body.trim().split(/\s+/).filter(Boolean).length;
+  // Mirrors saveScriptVersion: an empty v1 draft is filled in place, otherwise a new version is added.
+  const nextVersion = latest && latest.version === 1 && latest.isEmpty ? 1 : (latest?.version ?? 0) + 1;
 
-  async function handleNewVersion() {
-    setSaving(true);
-    await createScriptVersion(script.contentItemId, body);
-    setSaving(false);
-  }
-
-  async function handleGetFeedback() {
-    setLoadingFeedback(true);
-    setFeedback(null);
-    try {
-      const res = await fetch('/api/ai/script-feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scriptId: script.id, scriptBody: body }),
-      });
-      const text = await res.text();
-      const lines = text.trim().split('\n').filter(Boolean);
-      for (const line of lines.reverse()) {
-        try {
-          const parsed = JSON.parse(line);
-          if (parsed.overallScore) { setFeedback(parsed); break; }
-        } catch { /* continue */ }
+  function save() {
+    if (!dirty || isPending) return;
+    setMessage(null);
+    startTransition(async () => {
+      const result = await saveScriptVersion(script.contentItemId, bodyRef.current);
+      if (!result.ok) {
+        setMessage({ kind: 'error', text: result.error });
+        return;
       }
-    } finally {
-      setLoadingFeedback(false);
-    }
+      const { scriptId, version, unchanged } = result.data;
+      if (scriptId !== script.id) {
+        // The text now lives in the new version. Reset this (older) version's editor so that
+        // coming back to it via history shows its own body rather than stale "unsaved" text.
+        bodyRef.current = script.body;
+        setBody(script.body);
+        setMessage(null);
+        router.push(`/scripts/${scriptId}`);
+        return;
+      }
+      setMessage({ kind: 'ok', text: unchanged ? `No changes — already saved as v${version}.` : `Saved as v${version}.` });
+    });
   }
+
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => {
+      if (bodyRef.current !== script.body) e.preventDefault();
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [script.body]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <div className="space-y-3">
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          className="w-full h-96 rounded-lg border bg-card p-4 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-          placeholder="Write your script here..."
-        />
-        <div className="flex gap-2">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-60"
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-          <button
-            onClick={handleNewVersion}
-            disabled={saving}
-            className="rounded-md border px-4 py-2 text-sm disabled:opacity-60"
-          >
-            New Version
-          </button>
-          <button
-            onClick={handleGetFeedback}
-            disabled={loadingFeedback || !body.trim()}
-            className="rounded-md border px-4 py-2 text-sm disabled:opacity-60"
-          >
-            {loadingFeedback ? 'Analysing...' : 'Get AI Feedback'}
-          </button>
-        </div>
-      </div>
+    <Row gutter={[24, 24]}>
+      <Col xs={24} xl={15}>
+        <Card
+          aria-labelledby="script-editor-heading"
+          title={
+            <span id="script-editor-heading">
+              Version {script.version}
+              {script.isActive && (
+                <Typography.Text type="secondary" style={{ fontWeight: 400, marginInlineStart: 8 }}>
+                  (current)
+                </Typography.Text>
+              )}
+            </span>
+          }
+          extra={
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {words} {words === 1 ? 'word' : 'words'} · {body.length.toLocaleString()} chars
+            </Typography.Text>
+          }
+          styles={{ body: { display: 'flex', flexDirection: 'column', gap: 12 } }}
+        >
+          {!isLatest && (
+            <Alert
+              type="warning"
+              showIcon
+              title={
+                <>
+                  You are viewing an older version. Saving will create v{nextVersion} from this text.{' '}
+                  <Link href={`/scripts/${latest.id}`} style={{ fontWeight: 500, textDecoration: 'underline' }}>
+                    Open v{latest.version}
+                  </Link>
+                </>
+              }
+            />
+          )}
 
-      <div className="rounded-lg border bg-card p-4 space-y-4">
-        <h2 className="font-semibold text-sm">AI Feedback</h2>
-        {!feedback && !loadingFeedback && (
-          <p className="text-sm text-muted-foreground">Click &quot;Get AI Feedback&quot; to analyse your script.</p>
-        )}
-        {loadingFeedback && <p className="text-sm text-muted-foreground animate-pulse">Analysing...</p>}
-        {feedback && (
-          <div className="space-y-3 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">Score:</span>
-              <span className="text-2xl font-bold">{feedback.overallScore}/10</span>
-            </div>
-            <div>
-              <p className="font-medium mb-1">Hook Analysis</p>
-              <p className="text-muted-foreground">{feedback.hookAnalysis}</p>
-            </div>
-            <div>
-              <p className="font-medium mb-1">Strengths</p>
-              <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                {feedback.strengths.map((s, i) => <li key={i}>{s}</li>)}
-              </ul>
-            </div>
-            <div>
-              <p className="font-medium mb-1">Improvements</p>
-              <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                {feedback.improvements.map((s, i) => <li key={i}>{s}</li>)}
-              </ul>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+          <label htmlFor="script-body" className="sr-only">
+            Script
+          </label>
+          <Input.TextArea
+            id="script-body"
+            value={body}
+            maxLength={SCRIPT_LIMITS.body}
+            onChange={(e) => {
+              bodyRef.current = e.target.value;
+              setBody(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                save();
+              }
+            }}
+            autoSize={{ minRows: 20 }}
+            placeholder={'Write your script here…\n\nHOOK:\n\nBODY:\n\nCTA:'}
+            spellCheck
+            style={{ fontFamily: 'var(--font-geist-mono, ui-monospace), SFMono-Regular, Menlo, Consolas, monospace', fontSize: 13, lineHeight: 1.65 }}
+          />
+
+          <Flex align="center" gap={12} wrap>
+            <Button type="primary" icon={<SaveOutlined />} onClick={save} disabled={!dirty || isPending} loading={isPending}>
+              {isPending ? 'Saving…' : `Save as v${nextVersion}`}
+            </Button>
+            <Typography.Text
+              role="status"
+              aria-live="polite"
+              type={message?.kind === 'error' ? 'danger' : message ? 'success' : 'secondary'}
+              style={{ fontSize: 12 }}
+            >
+              {message ? message.text : dirty ? 'Unsaved changes (⌘/Ctrl+S to save)' : ''}
+            </Typography.Text>
+          </Flex>
+        </Card>
+      </Col>
+
+      <Col xs={24} xl={9}>
+        <Flex vertical gap={24}>
+          <ScriptFeedbackPanel scriptId={script.id} body={body} savedBody={script.body} initialFeedback={initialFeedback} />
+
+          <Card
+            size="small"
+            aria-labelledby="version-history-heading"
+            title={<span id="version-history-heading">Version history</span>}
+          >
+            <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+              Every save is kept, so you can go back to any previous draft.
+            </Typography.Text>
+            <RowList
+              size="small"
+              items={versions}
+              rowKey={(v) => v.id}
+              renderItem={(v) => {
+                const viewing = v.id === script.id;
+                return (
+                  <div
+                    style={{
+                      width: '100%',
+                      padding: '4px 8px',
+                      borderRadius: 8,
+                      background: viewing ? 'var(--ant-color-fill-quaternary)' : undefined,
+                    }}
+                  >
+                    <Flex justify="space-between" align="center" style={{ width: '100%' }} gap={8}>
+                      <span>
+                        {viewing ? (
+                          <Typography.Text strong aria-current="true">
+                            v{v.version}
+                          </Typography.Text>
+                        ) : (
+                          <Link href={`/scripts/${v.id}`} style={{ fontWeight: 500, textDecoration: 'underline' }}>
+                            v{v.version}
+                          </Link>
+                        )}
+                        {v.isActive && (
+                          <Tag color="success" style={{ marginInlineStart: 8, marginInlineEnd: 0 }}>
+                            latest
+                          </Tag>
+                        )}
+                      </span>
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        {v.wordCount} words · {formatDate(v.updatedAt)}
+                      </Typography.Text>
+                    </Flex>
+                  </div>
+                );
+              }}
+            />
+          </Card>
+        </Flex>
+      </Col>
+    </Row>
   );
 }

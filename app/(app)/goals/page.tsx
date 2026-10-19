@@ -1,11 +1,15 @@
 ﻿import { auth } from '@/lib/auth-server';
 import { redirect } from 'next/navigation';
+import { connection } from 'next/server';
+import { Col, Flex, Row } from 'antd';
 import { db } from '@/lib/db';
 import { GoalSetter } from '@/components/goals/GoalSetter';
 import { StreakTracker } from '@/components/goals/StreakTracker';
 import { ChallengeList } from '@/components/goals/ChallengeList';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 export default async function GoalsPage() {
+  await connection(); // per-user data: render at request time
   const { userId } = await auth();
   if (!userId) redirect('/sign-in');
 
@@ -23,22 +27,20 @@ export default async function GoalsPage() {
   ]);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Goals & Consistency</h1>
-        <p className="text-muted-foreground">Stay on track with your creator habits</p>
-      </div>
+    <div>
+      <PageHeader title="Goals & Consistency" subtitle="Stay on track with your creator habits" />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
-          <GoalSetter goals={goals} userId={user.id} />
-          <ChallengeList challenges={challenges} userId={user.id} />
-        </div>
-        <div>
+      <Row gutter={[24, 24]}>
+        <Col xs={24} lg={16}>
+          <Flex vertical gap={24}>
+            <GoalSetter goals={goals} userId={user.id} />
+            <ChallengeList challenges={challenges} userId={user.id} />
+          </Flex>
+        </Col>
+        <Col xs={24} lg={8}>
           <StreakTracker streak={streak} />
-        </div>
-      </div>
+        </Col>
+      </Row>
     </div>
   );
 }
-

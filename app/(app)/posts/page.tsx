@@ -1,9 +1,12 @@
 ﻿import { auth } from '@/lib/auth-server';
 import { redirect } from 'next/navigation';
+import { connection } from 'next/server';
 import { db } from '@/lib/db';
 import { PostList } from '@/components/posts/PostList';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 export default async function PostsPage() {
+  await connection(); // per-user data: render at request time
   const { userId } = await auth();
   if (!userId) redirect('/sign-in');
 
@@ -13,17 +16,16 @@ export default async function PostsPage() {
   const posts = await db.post.findMany({
     where: { userId: user.id },
     orderBy: { publishedAt: 'desc' },
-    include: { contentItem: true, metrics: { orderBy: { recordedAt: 'desc' }, take: 1 } },
+    include: {
+      contentItem: { select: { id: true, title: true } },
+      metrics: { orderBy: { recordedAt: 'desc' }, take: 1 },
+    },
   });
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Published Posts</h1>
-        <p className="text-muted-foreground">Track performance across all platforms</p>
-      </div>
+    <div>
+      <PageHeader title="Published Posts" subtitle="Track performance across all platforms" />
       <PostList posts={posts} />
     </div>
   );
 }
-
